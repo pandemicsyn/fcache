@@ -19,8 +19,6 @@ import (
 const (
 	// NoExpiration constant for NO ttl's
 	NoExpiration time.Duration = -1
-	// DefaultExpiration constant for the default ttl
-	DefaultExpiration time.Duration = 0
 )
 
 // FCache instance
@@ -31,9 +29,8 @@ type FCache struct {
 type fcache struct {
 	sync.RWMutex
 	items map[string]*Item
-	p     bool
-	s     int
-	e     time.Duration
+	s     int           //map size
+	e     time.Duration //default expiration times for this cache
 }
 
 // Item is our cache object and its expiration time
@@ -50,7 +47,7 @@ func (i *Item) Expired() bool {
 	return i.Expiration.Before(time.Now())
 }
 
-//Set a key/value/ttl
+//Set a key/value/ttl you can set ttl to NoExpiration or -1 for no ttl.
 func (c *fcache) Set(k string, v interface{}, ttl time.Duration) {
 	c.Lock()
 	c.setWithTTL(k, v, ttl)
@@ -69,8 +66,8 @@ func (c *fcache) setWithTTL(k string, v interface{}, ttl time.Duration) {
 	}
 }
 
-//IncrementInt increment's an int, create the key initialized to 0 and
-//then increment it by the given if it doesn't exist or is expired.
+//IncrementInt increment's a int, if the key doesn't exist or is expired
+//then create tkey initialized to 0 and increment it automatically.
 func (c *fcache) IncrementInt(k string, n int) error {
 	c.Lock()
 	v, found := c.items[k]
@@ -89,8 +86,8 @@ func (c *fcache) IncrementInt(k string, n int) error {
 	return nil
 }
 
-//IncrementFloat64 increments an in64, create the key initialized to 0 and
-//then increment it by the given if it doesn't exist or is expired.
+//IncrementInt64 increments an int64, if the key doesn't exist or is expired
+//then create the key initialized to 0 increment it automatically.
 func (c *fcache) IncrementInt64(k string, n int64) error {
 	c.Lock()
 	v, found := c.items[k]
@@ -109,8 +106,8 @@ func (c *fcache) IncrementInt64(k string, n int64) error {
 	return nil
 }
 
-//IncrementFloat64 increment a float64, create the key initialized to 0 and
-//then increment it by the given if it doesn't exist or is expired.
+//IncrementFloat64 increments an Float64, if the key doesn't exist or is expired
+//then create the key initialized to 0 increment it automatically.
 func (c *fcache) IncrementFloat64(k string, n float64) error {
 	c.Lock()
 	v, found := c.items[k]
@@ -172,24 +169,51 @@ func (c *fcache) Delete(k string) {
 // Empty the cache completely
 func (c *fcache) Empty() {
 	c.Lock()
-	if c.p {
-		c.items = make(map[string]*Item, c.s)
-	} else {
-		c.items = make(map[string]*Item)
-	}
+	c.items = make(map[string]*Item, c.s)
 	c.Unlock()
 }
 
-//NewPreAllocated cache creates a new cache with preallocated map of given size
-func NewPreAllocated(size int) *FCache {
-	items := make(map[string]*Item, size)
-	return &FCache{newCache(items, true, size, NoExpiration)}
+//DefaultTTL lets you set a default TTL for autocreated entries.
+//(like those created when Incrementing a previously non existent key.)
+func (c *fcache) DefaultTTL(ttl time.Duration) error {
+	if ttl <= 0 {
+		return fmt.Errorf("Default TTL must be greater than 0")
+	}
+	c.e = ttl
+	return nil
 }
 
-func newCache(items map[string]*Item, p bool, s int, e time.Duration) *fcache {
+//UpdateTTL lets you update the ttl for a given key, returns an error
+//if key doesn't exist.
+func (c *fcache) UpdateTTL(k string, ttl time.Duration) error {
+	c.Lock()
+	item, found := c.items[k]
+	if !found || item.Expired() {
+		if found && item.Expired() {
+			go c.asyncExpiredDel(k)
+		}
+		c.Unlock()
+		return fmt.Errorf("No such key")
+	}
+	var e *time.Time
+	t := time.Now().Add(ttl)
+	e = &t
+	c.items[k].Expiration = e
+	c.Unlock()
+	return nil
+}
+
+//New cache creates a new cache with preallocated map of given number of entries
+//it can grow beyond this but this can help performance while cache is initially being
+//populated.
+func New(size int) *FCache {
+	items := make(map[string]*Item, size)
+	return &FCache{newCache(items, size, NoExpiration)}
+}
+
+func newCache(items map[string]*Item, s int, e time.Duration) *fcache {
 	c := &fcache{
 		items: items,
-		p:     p,
 		s:     s,
 		e:     e,
 	}

@@ -10,7 +10,7 @@ import (
 func TestFCache(t *testing.T) {
 	var err error
 
-	testcache := NewPreAllocated(100)
+	testcache := New(100)
 	v, found := testcache.Get("wat")
 	if found {
 		t.Error("Cache returned found for value that shouldn't exist")
@@ -19,10 +19,18 @@ func TestFCache(t *testing.T) {
 		t.Error("Cache returned value that shouldn't exist")
 	}
 
-	testcache.Set("testkey", "testvalue", 30*time.Second)
+	testcache.Set("testkey", "testvalue", NoExpiration)
 	v, found = testcache.Get("testkey")
 	if !found || v != "testvalue" {
 		t.Error("Set key doesn't exist or has incorrect value:", v)
+	}
+
+	//test expiration
+	testcache.Set("expiredkey", "expiredvalue", 1*time.Nanosecond)
+	time.Sleep(2 * time.Nanosecond)
+	_, found = testcache.Get("expiredkey")
+	if found {
+		t.Error("Error encountered expired key!")
 	}
 
 	err = testcache.IncrementInt("firstpost!", 41)
@@ -60,11 +68,12 @@ func TestFCache(t *testing.T) {
 	if found {
 		t.Error("Error flushing all keys!")
 	}
+
 }
 
 func BenchmarkFCacheGet(b *testing.B) {
 	b.StopTimer()
-	c := NewPreAllocated(100)
+	c := New(100)
 	c.Set("testkey", "testvalue", NoExpiration)
 	b.StartTimer()
 	for i := 0; i < b.N; i++ {
@@ -72,9 +81,20 @@ func BenchmarkFCacheGet(b *testing.B) {
 	}
 }
 
+func BenchmarkFCachSetGetExpired(b *testing.B) {
+	b.StopTimer()
+	c := New(100)
+	b.StartTimer()
+	for i := 0; i < b.N; i++ {
+		c.Set("testkey", "testvalue", 1*time.Nanosecond)
+		time.Sleep(1 * time.Nanosecond)
+		c.Get("testkey")
+	}
+}
+
 func BenchmarkFCacheConcurrentGet(b *testing.B) {
 	b.StopTimer()
-	c := NewPreAllocated(100)
+	c := New(100)
 	c.Set("testkey", "testvalue", NoExpiration)
 	wg := new(sync.WaitGroup)
 	workers := runtime.NumCPU()
@@ -94,7 +114,7 @@ func BenchmarkFCacheConcurrentGet(b *testing.B) {
 
 func BenchmarkFCacheIncrementInt(b *testing.B) {
 	b.StopTimer()
-	c := NewPreAllocated(100)
+	c := New(100)
 	c.IncrementInt("testkey", 1)
 	b.StartTimer()
 	for i := 0; i < b.N; i++ {
@@ -104,7 +124,7 @@ func BenchmarkFCacheIncrementInt(b *testing.B) {
 
 func BenchmarkFCacheIncrementFloat64(b *testing.B) {
 	b.StopTimer()
-	c := NewPreAllocated(100)
+	c := New(100)
 	c.IncrementFloat64("testkey", 1.0)
 	b.StartTimer()
 	for i := 0; i < b.N; i++ {
@@ -114,10 +134,19 @@ func BenchmarkFCacheIncrementFloat64(b *testing.B) {
 
 func BenchmarkFCacheSet(b *testing.B) {
 	b.StopTimer()
-	c := NewPreAllocated(100)
+	c := New(100)
 	b.StartTimer()
 	for i := 0; i < b.N; i++ {
-		c.Set("testkey", "testvalue", NoExpiration)
+		c.Set("1", "v", NoExpiration)
+	}
+}
+
+func BenchmarkFCacheSetCast(b *testing.B) {
+	b.StopTimer()
+	c := New(100)
+	b.StartTimer()
+	for i := 0; i < b.N; i++ {
+		c.Set(string(1), "v", NoExpiration)
 	}
 }
 
@@ -135,7 +164,7 @@ func BenchmarkRWMutexMapSet(b *testing.B) {
 
 func BenchmarkFCacheSetDelete(b *testing.B) {
 	b.StopTimer()
-	c := NewPreAllocated(100)
+	c := New(100)
 	b.StartTimer()
 	for i := 0; i < b.N; i++ {
 		c.Set("testkey", "v", NoExpiration)
@@ -160,7 +189,7 @@ func BenchmarkRWMutexMapSetDelete(b *testing.B) {
 
 func BenchmarkFCacheConcurrentSet(b *testing.B) {
 	b.StopTimer()
-	c := NewPreAllocated(100)
+	c := New(100)
 	wg := new(sync.WaitGroup)
 	workers := runtime.NumCPU()
 	each := b.N / workers
@@ -179,7 +208,16 @@ func BenchmarkFCacheConcurrentSet(b *testing.B) {
 
 func BenchmarkFCacheSetGrowing(b *testing.B) {
 	b.StopTimer()
-	c := NewPreAllocated(1)
+	c := New(1)
+	b.StartTimer()
+	for i := 0; i < b.N; i++ {
+		c.Set(string(i), "v", NoExpiration)
+	}
+}
+
+func BenchmarkFCacheSetPreAllocated(b *testing.B) {
+	b.StopTimer()
+	c := New(b.N)
 	b.StartTimer()
 	for i := 0; i < b.N; i++ {
 		c.Set(string(i), "v", NoExpiration)
@@ -188,7 +226,17 @@ func BenchmarkFCacheSetGrowing(b *testing.B) {
 
 func BenchmarkFCacheSetDeleteGrowing(b *testing.B) {
 	b.StopTimer()
-	c := NewPreAllocated(1)
+	c := New(1)
+	b.StartTimer()
+	for i := 0; i < b.N; i++ {
+		c.Set(string(i), "v", NoExpiration)
+		c.Delete(string(i))
+	}
+}
+
+func BenchmarkFCacheSetDeletePreAllocated(b *testing.B) {
+	b.StopTimer()
+	c := New(b.N)
 	b.StartTimer()
 	for i := 0; i < b.N; i++ {
 		c.Set(string(i), "v", NoExpiration)
