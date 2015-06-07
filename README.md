@@ -1,8 +1,10 @@
 fcache
 ======
 
-Simple Cache with TTL support that does **exactly** what *I need*. It probably doesn't do what you need.
-Inspired by go-cache and others (that where missing bits and pieces).
+It's a simple cache with TTL support that does what *I need*. It probably doesn't do what you need, but thats okay...
+
+
+[![GoDoc](https://godoc.org/github.com/pandemicsyn/fcache?status.svg)](https://godoc.org/github.com/pandemicsyn/fcache)
 
 benchmark
 =========
@@ -24,3 +26,7 @@ BenchmarkFCacheSetGrowing    1000000          1192 ns/op         173 B/op       
 BenchmarkFCacheSetDeleteGrowing  2000000           680 ns/op          56 B/op          4 allocs/op
 ok      github.com/pandemicsyn/fcache   18.457s
 ```
+
+supporting cast
+===============
+Inspired by go-cache and others (that extra stuff or where missing bits I wanted)

@@ -1,9 +1,11 @@
 /*
+
 Package fcache implements a basic fast in memory k/v cache
 
-Its a simple cache with TTL support that does what *I needed*.
+Its a simple cache with TTL support that does what *I need*.
 It probably doesn't do what you need, but thats okay...
-Inspired by go-cache and others (that where missing bits and pieces).
+
+Inspired by go-cache and others (that had extra stuff I didn't care for or where missing bits I wanted).
 
 */
 package fcache
