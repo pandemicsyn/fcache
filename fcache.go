@@ -67,12 +67,12 @@ func (c *fcache) setWithTTL(k string, v interface{}, ttl time.Duration) {
 }
 
 //IncrementInt increment's a int, if the key doesn't exist or is expired
-//then create tkey initialized to 0 and increment it automatically.
+//then create the key initialized to 0 and increment it automatically.
 func (c *fcache) IncrementInt(k string, n int) error {
 	c.Lock()
 	v, found := c.items[k]
 	if !found || v.Expired() {
-		c.setWithTTL(k, 0+n, NoExpiration)
+		c.setWithTTL(k, 0+n, c.e)
 		c.Unlock()
 		return nil
 	}
@@ -87,12 +87,12 @@ func (c *fcache) IncrementInt(k string, n int) error {
 }
 
 //IncrementInt64 increments an int64, if the key doesn't exist or is expired
-//then create the key initialized to 0 increment it automatically.
+//then create the key initialized to 0 and increment it automatically.
 func (c *fcache) IncrementInt64(k string, n int64) error {
 	c.Lock()
 	v, found := c.items[k]
 	if !found || v.Expired() {
-		c.setWithTTL(k, 0+n, NoExpiration)
+		c.setWithTTL(k, 0+n, c.e)
 		c.Unlock()
 		return nil
 	}
@@ -106,22 +106,20 @@ func (c *fcache) IncrementInt64(k string, n int64) error {
 	return nil
 }
 
-//IncrementFloat64 increments an Float64, if the key doesn't exist or is expired
-//then create the key initialized to 0 increment it automatically.
+//IncrementFloat64 increments an float64, if the key doesn't exist or is expired
+//then create the key initialized to 0 and increment it automatically.
 func (c *fcache) IncrementFloat64(k string, n float64) error {
 	c.Lock()
 	v, found := c.items[k]
 	if !found || v.Expired() {
-		if found && v.Expired() {
-			go c.asyncExpiredDel(k)
-		}
+		c.setWithTTL(k, 0+n, c.e)
 		c.Unlock()
-		return fmt.Errorf("No such key")
+		return nil
 	}
 	rv, ok := v.Object.(float64)
 	if !ok {
 		c.Unlock()
-		return fmt.Errorf("Value not an float64")
+		return fmt.Errorf("Value not an int64")
 	}
 	v.Object = rv + n
 	c.Unlock()
