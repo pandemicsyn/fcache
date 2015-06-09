@@ -2,6 +2,7 @@ package fcache
 
 import (
 	"runtime"
+	"strconv"
 	"sync"
 	"testing"
 	"time"
@@ -83,12 +84,12 @@ func BenchmarkFCacheGet(b *testing.B) {
 
 func BenchmarkFCachSetGetExpired(b *testing.B) {
 	b.StopTimer()
-	c := New(100)
+	c := New(b.N)
 	b.StartTimer()
 	for i := 0; i < b.N; i++ {
-		c.Set("testkey", "testvalue", 1*time.Nanosecond)
+		c.Set(strconv.Itoa(i), ".", 1*time.Nanosecond)
 		time.Sleep(1 * time.Nanosecond)
-		c.Get("testkey")
+		c.Get(strconv.Itoa(i))
 	}
 }
 
@@ -146,7 +147,7 @@ func BenchmarkFCacheSetCast(b *testing.B) {
 	c := New(100)
 	b.StartTimer()
 	for i := 0; i < b.N; i++ {
-		c.Set(string(1), "v", NoExpiration)
+		c.Set(strconv.Itoa(1), "v", NoExpiration)
 	}
 }
 
@@ -211,7 +212,7 @@ func BenchmarkFCacheSetGrowing(b *testing.B) {
 	c := New(1)
 	b.StartTimer()
 	for i := 0; i < b.N; i++ {
-		c.Set(string(i), "v", NoExpiration)
+		c.Set(strconv.Itoa(i), "v", NoExpiration)
 	}
 }
 
@@ -220,7 +221,7 @@ func BenchmarkFCacheSetPreAllocated(b *testing.B) {
 	c := New(b.N)
 	b.StartTimer()
 	for i := 0; i < b.N; i++ {
-		c.Set(string(i), "v", NoExpiration)
+		c.Set(strconv.Itoa(i), "v", NoExpiration)
 	}
 }
 
@@ -229,8 +230,8 @@ func BenchmarkFCacheSetDeleteGrowing(b *testing.B) {
 	c := New(1)
 	b.StartTimer()
 	for i := 0; i < b.N; i++ {
-		c.Set(string(i), "v", NoExpiration)
-		c.Delete(string(i))
+		c.Set(strconv.Itoa(i), "v", NoExpiration)
+		c.Delete(strconv.Itoa(i))
 	}
 }
 
@@ -239,7 +240,7 @@ func BenchmarkFCacheSetDeletePreAllocated(b *testing.B) {
 	c := New(b.N)
 	b.StartTimer()
 	for i := 0; i < b.N; i++ {
-		c.Set(string(i), "v", NoExpiration)
-		c.Delete(string(i))
+		c.Set(strconv.Itoa(i), "v", NoExpiration)
+		c.Delete(strconv.Itoa(i))
 	}
 }

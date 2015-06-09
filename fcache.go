@@ -39,7 +39,7 @@ type Item struct {
 	Expiration *time.Time
 }
 
-//Expired returns whether an item is expired or not
+// Expired returns whether an item is expired or not
 func (i *Item) Expired() bool {
 	if i.Expiration == nil {
 		return false
@@ -47,7 +47,7 @@ func (i *Item) Expired() bool {
 	return i.Expiration.Before(time.Now())
 }
 
-//Set a key/value/ttl you can set ttl to NoExpiration or -1 for no ttl.
+// Set a key/value/ttl you can set ttl to NoExpiration or -1 for no ttl.
 func (c *fcache) Set(k string, v interface{}, ttl time.Duration) {
 	c.Lock()
 	c.setWithTTL(k, v, ttl)
@@ -66,8 +66,8 @@ func (c *fcache) setWithTTL(k string, v interface{}, ttl time.Duration) {
 	}
 }
 
-//IncrementInt increment's a int, if the key doesn't exist or is expired
-//then create the key initialized to 0 and increment it automatically.
+// IncrementInt increment's a int, if the key doesn't exist or is expired
+// then create the key initialized to 0 and increment it automatically.
 func (c *fcache) IncrementInt(k string, n int) error {
 	c.Lock()
 	v, found := c.items[k]
@@ -86,8 +86,8 @@ func (c *fcache) IncrementInt(k string, n int) error {
 	return nil
 }
 
-//IncrementInt64 increments an int64, if the key doesn't exist or is expired
-//then create the key initialized to 0 and increment it automatically.
+// IncrementInt64 increments an int64, if the key doesn't exist or is expired
+// then create the key initialized to 0 and increment it automatically.
 func (c *fcache) IncrementInt64(k string, n int64) error {
 	c.Lock()
 	v, found := c.items[k]
@@ -106,8 +106,8 @@ func (c *fcache) IncrementInt64(k string, n int64) error {
 	return nil
 }
 
-//IncrementFloat64 increments an float64, if the key doesn't exist or is expired
-//then create the key initialized to 0 and increment it automatically.
+// IncrementFloat64 increments an float64, if the key doesn't exist or is expired
+// then create the key initialized to 0 and increment it automatically.
 func (c *fcache) IncrementFloat64(k string, n float64) error {
 	c.Lock()
 	v, found := c.items[k]
@@ -171,8 +171,8 @@ func (c *fcache) Empty() {
 	c.Unlock()
 }
 
-//DefaultTTL lets you set a default TTL for autocreated entries.
-//(like those created when Incrementing a previously non existent key.)
+// DefaultTTL lets you set a default TTL for autocreated entries.
+// (like those created when Incrementing a previously non existent key.)
 func (c *fcache) DefaultTTL(ttl time.Duration) error {
 	if ttl <= 0 {
 		return fmt.Errorf("Default TTL must be greater than 0")
@@ -181,8 +181,8 @@ func (c *fcache) DefaultTTL(ttl time.Duration) error {
 	return nil
 }
 
-//UpdateTTL lets you update the ttl for a given key, returns an error
-//if key doesn't exist.
+// UpdateTTL lets you update the ttl for a given key, returns an error
+// if key doesn't exist.
 func (c *fcache) UpdateTTL(k string, ttl time.Duration) error {
 	c.Lock()
 	item, found := c.items[k]
@@ -201,12 +201,40 @@ func (c *fcache) UpdateTTL(k string, ttl time.Duration) error {
 	return nil
 }
 
-//New cache creates a new cache with preallocated map of given number of entries
-//it can grow beyond this but this can help performance while cache is initially being
-//populated.
+func (c *fcache) reaper(interval time.Duration) {
+	ticker := time.NewTicker(interval)
+	for _ = range ticker.C {
+		go c.reap()
+	}
+}
+
+func (c *fcache) reap() {
+	checked := 0
+	c.Lock()
+	//we'll exploit the fact that range on maps is random
+	//to just randomly walk a rough subset of the map every time
+	maxreap := len(c.items) / 4
+	for k, v := range c.items {
+		if checked > maxreap {
+			c.Unlock()
+			return
+		}
+		if v.Expired() {
+			delete(c.items, k)
+		}
+		checked++
+	}
+	c.Unlock()
+}
+
+// New cache creates a new cache with preallocated map of given number of entries
+// it can grow beyond this but this can help performance while cache is initially being
+// populated.
 func New(size int) *FCache {
 	items := make(map[string]*Item, size)
-	return &FCache{newCache(items, size, NoExpiration)}
+	C := &FCache{newCache(items, size, NoExpiration)}
+	go C.reaper(1 * time.Second)
+	return C
 }
 
 func newCache(items map[string]*Item, s int, e time.Duration) *fcache {
